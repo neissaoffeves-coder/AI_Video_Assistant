@@ -16,14 +16,26 @@ def find_highlights(video_path, min_clip_duration=15, max_clip_duration=60):
     C'est une simplification. Une version avancée analyserait aussi l'audio et la vidéo.
     """
     print("1. Lancement de la transcription avec Whisper...")
-    model = whisper.load_model("base") # "base" est rapide, "medium" est plus précis
-    # Nous devons extraire l'audio pour Whisper
-    video = mp.VideoFileClip(video_path)
-    audio_path = "temp_audio.wav"
-    video.audio.write_audiofile(audio_path)
+    model = whisper.load_model("base")
     
+    video = mp.VideoFileClip(video_path)
+    
+    # --- DÉBUT DE LA CORRECTION ---
+    # On vérifie si la vidéo a une piste audio
+    if video.audio is None:
+        print("ERREUR: La vidéo ne contient pas de piste audio.")
+        # On retourne une liste vide car on ne peut pas analyser une vidéo sans son
+        return [] 
+    # --- FIN DE LA CORRECTION ---
+
+    audio_path = "temp_audio.wav"
+    print("Extraction de la piste audio...")
+    video.audio.write_audiofile(audio_path) # Maintenant, cette ligne est sécurisée
+    
+    print("Transcription de l'audio avec Whisper...")
     result = model.transcribe(audio_path, word_timestamps=True)
-    os.remove(audio_path) # Nettoyage
+    os.remove(audio_path)
+    # ... reste du code
 
     print("2. Identification des moments forts...")
     highlights = []
