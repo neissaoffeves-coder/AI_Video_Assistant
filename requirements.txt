@@ -1,0 +1,10 @@
+streamlit
+moviepy
+opencv-python
+openai-whisper
+transformers
+torch
+# Pour l'API YouTube
+google-api-python-client
+google-auth-oauthlib
+google-auth-httplib2
