@@ -5,11 +5,12 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
 # Ce fichier est généré par la Google Cloud Console quand vous créez des identifiants OAuth2
+# LIGNE À CHANGER
 CLIENT_SECRETS_FILE = "client_secrets.json"
-SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 
 def get_authenticated_service():
     """Authentifie l'utilisateur et retourne un objet service pour l'API YouTube."""
+    # LIGNE À CHANGER
     flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRETS_FILE, SCOPES)
     credentials = flow.run_local_server(port=0)
     return build("youtube", "v3", credentials=credentials)
