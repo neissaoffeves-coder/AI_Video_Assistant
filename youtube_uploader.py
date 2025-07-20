@@ -5,15 +5,40 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
 # Ce fichier est généré par la Google Cloud Console quand vous créez des identifiants OAuth2
-# LIGNE À CHANGER
-CLIENT_SECRETS_FILE = "client_secrets.json"
+import streamlit as st
+from google.oauth2.credentials import Credentials
+# ... autres imports
 
 def get_authenticated_service():
-    """Authentifie l'utilisateur et retourne un objet service pour l'API YouTube."""
-    # LIGNE À CHANGER
-    flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRETS_FILE, SCOPES)
-    credentials = flow.run_local_server(port=0)
-    return build("youtube", "v3", credentials=credentials)
+    """Authentifie l'utilisateur en utilisant les secrets de Streamlit."""
+    # On récupère les secrets stockés dans Streamlit
+    client_config = {
+        "installed": {
+            "client_id": st.secrets["installed"]["client_id"],
+            "project_id": st.secrets["installed"]["project_id"],
+            "auth_uri": st.secrets["installed"]["auth_uri"],
+            "token_uri": st.secrets["installed"]["token_uri"],
+            "auth_provider_x509_cert_url": st.secrets["installed"]["auth_provider_x509_cert_url"],
+            "client_secret": st.secrets["installed"]["client_secret"],
+            "redirect_uris": st.secrets["installed"]["redirect_uris"]
+        }
+    }
+    # Note: L'authentification 'run_local_server' ne fonctionne pas sur le cloud.
+    # Pour une vraie app déployée, il faudrait un flux web plus complexe.
+    # Pour l'instant, cette partie posera problème au déploiement.
+    # Une solution plus simple pour commencer serait de désactiver la fonctionnalité de publication YouTube.
+
+    # ***SOLUTION SIMPLIFIÉE POUR UN PREMIER DÉPLOIEMENT***
+    # Pour l'instant, commentons cette partie pour que l'app puisse se déployer
+    st.warning("La publication sur YouTube est désactivée dans la version en ligne.")
+    return None
+
+def upload_to_youtube(video_path, title, description, tags):
+    youtube = get_authenticated_service()
+    if youtube is None:
+        return None # On arrête la fonction si le service n'est pas dispo
+
+    # ... le reste du code
 
 def upload_to_youtube(video_path, title, description, tags):
     """
