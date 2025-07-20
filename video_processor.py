@@ -15,36 +15,55 @@ def find_highlights(video_path, min_clip_duration=15, max_clip_duration=60):
     Analyse la transcription pour trouver des segments denses en paroles.
     C'est une simplification. Une version avancée analyserait aussi l'audio et la vidéo.
     """
-    print("1. Lancement de la transcription avec Whisper...")
-    model = whisper.load_model("base")
+    print("1. Lancement de l'analyse vidéo...")
     
-    video = mp.VideoFileClip(video_path)
-    
+    try:
+        model = whisper.load_model("base") # "base" est rapide, "medium" est plus précis
+        video = mp.VideoFileClip(video_path)
+    except Exception as e:
+        print(f"Erreur lors du chargement de la vidéo ou du modèle Whisper : {e}")
+        return []
+
     # --- DÉBUT DE LA CORRECTION ---
-    # On vérifie si la vidéo a une piste audio
+    # On vérifie si la vidéo a une piste audio AVANT de continuer.
     if video.audio is None:
-        print("ERREUR: La vidéo ne contient pas de piste audio.")
-        # On retourne une liste vide car on ne peut pas analyser une vidéo sans son
+        print("ERREUR CRITIQUE: La vidéo fournie ne contient pas de piste audio.")
+        print("Le traitement ne peut pas continuer car il est basé sur l'analyse audio.")
+        # On arrête immédiatement la fonction et on retourne une liste vide.
         return [] 
     # --- FIN DE LA CORRECTION ---
 
+    # Si on arrive ici, c'est que la vidéo a bien une piste audio.
     audio_path = "temp_audio.wav"
     print("Extraction de la piste audio...")
-    video.audio.write_audiofile(audio_path) # Maintenant, cette ligne est sécurisée
+    video.audio.write_audiofile(audio_path) # Cette ligne est maintenant sécurisée.
     
-    print("Transcription de l'audio avec Whisper...")
+    print("Transcription de l'audio avec Whisper (cela peut prendre du temps)...")
     result = model.transcribe(audio_path, word_timestamps=True)
-    os.remove(audio_path)
-    # ... reste du code
+    os.remove(audio_path) # Nettoyage du fichier audio temporaire
 
     print("2. Identification des moments forts...")
     highlights = []
+    
+    if not result or not result['segments']:
+        print("Aucun segment de parole détecté dans la vidéo.")
+        return []
+
     current_segment_words = []
-    segment_start_time = result['segments'][0]['words'][0]['start'] if result['segments'] else 0
+    # S'assurer que le premier segment a bien des mots pour éviter une erreur
+    if result['segments'] and result['segments'][0]['words']:
+        segment_start_time = result['segments'][0]['words'][0]['start']
+    else:
+        print("La transcription n'a pas pu identifier de mots avec des timestamps.")
+        return []
 
     # Simplification : on cherche les segments denses en mots
     for segment in result['segments']:
         for word_info in segment['words']:
+            # S'assurer que le mot a bien un timestamp de fin
+            if 'end' not in word_info:
+                continue
+                
             current_segment_words.append(word_info)
             duration = word_info['end'] - segment_start_time
             
@@ -63,7 +82,7 @@ def find_highlights(video_path, min_clip_duration=15, max_clip_duration=60):
                    segment_start_time = word_info['start']
 
     # Ajouter le dernier segment s'il est assez long
-    if current_segment_words and (current_segment_words[-1]['end'] - segment_start_time >= min_clip_duration):
+    if current_segment_words and 'end' in current_segment_words[-1] and (current_segment_words[-1]['end'] - segment_start_time >= min_clip_duration):
          highlights.append({
             "start": segment_start_time,
             "end": current_segment_words[-1]['end'],
@@ -85,7 +104,8 @@ def create_vertical_clip(video_path, start_time, end_time, output_filename):
     target_ratio = 1080 / 1920
     
     # Recadrer la vidéo originale pour la placer au centre
-    clip_resized = original_clip.resize(height=1920 * w / 1080)
+    # Note: cette logique peut être améliorée pour suivre les visages
+    clip_resized = original_clip.resize(width=1080)
     
     # Créer un fond en zoomant et floutant le clip original
     background_clip = original_clip.resize(height=1920)
@@ -96,13 +116,9 @@ def create_vertical_clip(video_path, start_time, end_time, output_filename):
     final_clip = mp.CompositeVideoClip([
         background_clip,
         clip_resized.set_position("center")
-    ], size=(1080, 1920))
+    ], size=(1080, 1920)).set_audio(original_clip.audio) # Ne pas oublier de rattacher l'audio !
     
-    # Ajout des sous-titres (simplifié, une version avancée animerait mot par mot)
-    # Pour cela, il faudrait relancer whisper sur le subclip pour des timestamps précis
-    # Pour l'instant, on n'ajoute pas les sous-titres pour garder le code simple.
-
-    final_clip.write_videofile(output_filename, codec="libx264", audio_codec="aac", temp_audiofile='temp-audio.m4a', remove_temp=True)
+    final_clip.write_videofile(output_filename, codec="libx264", audio_codec="aac", temp_audiofile='temp-audio.m4a', remove_temp=True, threads=4)
     return output_filename
 
 def process_video(video_path):
@@ -115,8 +131,13 @@ def process_video(video_path):
     os.makedirs("temp_clips")
 
     highlights = find_highlights(video_path)
-    generated_clips = []
+    
+    # Si aucun moment fort n'est trouvé, on arrête
+    if not highlights:
+        print("Aucun moment fort trouvé, fin du processus.")
+        return []
 
+    generated_clips = []
     for i, highlight in enumerate(highlights):
         output_filename = os.path.join("temp_clips", f"clip_{i+1}.mp4")
         clip_path = create_vertical_clip(video_path, highlight["start"], highlight["end"], output_filename)
